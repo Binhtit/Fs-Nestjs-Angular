@@ -119,9 +119,9 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], TasksDddController.prototype, "remove", null);
 exports.TasksDddController = TasksDddController = __decorate([
-    (0, swagger_1.ApiTags)('Tasks (DDD + CQRS)'),
+    (0, swagger_1.ApiTags)('Tasks-DDD (CQRS)'),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, common_1.Controller)('tasks'),
+    (0, common_1.Controller)('tasks-ddd'),
     __metadata("design:paramtypes", [cqrs_1.CommandBus,
         cqrs_1.QueryBus])
 ], TasksDddController);

@@ -581,9 +581,10 @@ Angular (4200) ──HTTP──→ NestJS (3000)
 
 ## 6. KNOWN ISSUES & LƯU Ý
 
-1. **Dual Task Controllers**: BE có 2 controllers cùng path `/tasks`.
-   - Module register cả 2 → có thể conflict.
-   - Cần review: giữ 1 hoặc tách path (`/tasks` vs `/tasks-ddd`).
+1. ~~**Dual Task Controllers**: BE có 2 controllers cùng path `/tasks`~~ **ĐÃ FIX**
+   - DDD controller đổi path thành `/api/v1/tasks-ddd`
+   - Simple CRUD controller giữ `/api/v1/tasks` (FE dùng)
+   - Swagger hiện 2 nhóm riêng: `Tasks` và `Tasks-DDD (CQRS)`
 
 2. **CORS**: Đang dùng `origin: '*'` → production cần set specific domain.
 

@@ -36,7 +36,7 @@ export class TaskStore {
   searchTerm = signal('');
   statusFilter = signal<TaskStatus | ''>('');
 
-  /** === DERIVED STATE (Computed) === */
+  /** === DERIVED STATE (Computed) — có guard Array.isArray phòng bug BE === */
   todoCount = computed(() => this.tasks().filter((t) => t.status === 'TODO').length);
   progressCount = computed(() => this.tasks().filter((t) => t.status === 'IN_PROGRESS').length);
   doneCount = computed(() => this.tasks().filter((t) => t.status === 'DONE').length);

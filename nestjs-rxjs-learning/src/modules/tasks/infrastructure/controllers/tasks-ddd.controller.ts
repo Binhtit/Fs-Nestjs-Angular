@@ -40,9 +40,11 @@ import { UpdateTaskDto } from '../../dto/update-task.dto';
 import { QueryTaskDto } from '../../dto/query-task.dto';
 import { Task } from '../../domain/entities/task.entity';
 
-@ApiTags('Tasks (DDD + CQRS)')
+@ApiTags('Tasks-DDD (CQRS)')
 @ApiBearerAuth()
-@Controller('tasks')
+@Controller('tasks-ddd')
+// LƯU Ý: 'tasks-ddd' để tránh conflict với Simple CRUD Controller (/api/v1/tasks)
+// FE kết nối: /api/v1/tasks (Simple) | Learning: /api/v1/tasks-ddd (DDD + CQRS)
 export class TasksDddController {
   constructor(
     private readonly commandBus: CommandBus,
