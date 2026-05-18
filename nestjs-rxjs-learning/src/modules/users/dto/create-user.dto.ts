@@ -13,7 +13,13 @@
  * - Dùng 1 DTO cho cả create/update → update phải gửi TẤT CẢ fields
  */
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class CreateUserDto {
   /**
@@ -27,7 +33,7 @@ export class CreateUserDto {
   @ApiProperty({ example: 'user@example.com', description: 'Email đăng nhập' })
   @IsEmail({}, { message: 'Email không đúng định dạng' })
   @IsNotEmpty({ message: 'Email không được để trống' })
-  email: string;
+  email!: string;
 
   /**
    * @MinLength(6): Password phải ít nhất 6 ký tự
@@ -38,10 +44,13 @@ export class CreateUserDto {
    * - 6 là minimum hợp lý cho learning project
    * - Production: Recommend 8+ với complexity requirements
    */
-  @ApiProperty({ example: 'password123', description: 'Mật khẩu (tối thiểu 6 ký tự)' })
+  @ApiProperty({
+    example: 'password123',
+    description: 'Mật khẩu (tối thiểu 6 ký tự)',
+  })
   @IsString({ message: 'Mật khẩu phải là chuỗi' })
   @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
-  password: string;
+  password!: string;
 
   /**
    * @IsString() + @IsNotEmpty(): Validate string không rỗng
@@ -49,7 +58,7 @@ export class CreateUserDto {
   @ApiProperty({ example: 'Nguyễn Văn A', description: 'Họ tên' })
   @IsString({ message: 'Tên phải là chuỗi' })
   @IsNotEmpty({ message: 'Tên không được để trống' })
-  name: string;
+  name!: string;
 
   /**
    * @IsOptional(): Field này không bắt buộc

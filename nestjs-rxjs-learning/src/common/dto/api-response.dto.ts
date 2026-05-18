@@ -53,16 +53,16 @@ export interface PaginationMeta {
  */
 export class ApiResponse<T> {
   @ApiProperty({ description: 'Kết quả xử lý', example: true })
-  success: boolean;
+  success: boolean = false;
 
   @ApiProperty({ description: 'HTTP status code', example: 200 })
-  statusCode: number;
+  statusCode: number = 200;
 
   @ApiProperty({ description: 'Thông báo', example: 'Thành công' })
-  message: string;
+  message: string = '';
 
   @ApiProperty({ description: 'Dữ liệu trả về' })
-  data: T | null;
+  data: T | null = null;
 
   @ApiPropertyOptional({ description: 'Metadata phân trang' })
   pagination?: PaginationMeta;
@@ -71,13 +71,13 @@ export class ApiResponse<T> {
     description: 'Thời điểm response',
     example: '2024-01-01T00:00:00.000Z',
   })
-  timestamp: string;
+  timestamp: string = '';
 
   @ApiProperty({
     description: 'Request path',
     example: '/api/v1/tasks',
   })
-  path: string;
+  path: string = '';
 
   /**
    * Factory method: Tạo response thành công
@@ -87,7 +87,11 @@ export class ApiResponse<T> {
    * - Flexible: Có thể tạo nhiều factory method cho các case khác nhau
    * - Immutable-friendly: Factory method tạo object mới, không mutate
    */
-  static success<T>(data: T, message = 'Thành công', path = ''): ApiResponse<T> {
+  static success<T>(
+    data: T,
+    message = 'Thành công',
+    path = '',
+  ): ApiResponse<T> {
     const response = new ApiResponse<T>();
     response.success = true;
     response.statusCode = 200;
