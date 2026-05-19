@@ -117,6 +117,7 @@ export class AppModule implements NestModule {
    * Middleware chạy TRƯỚC mọi thứ khác
    */
   configure(consumer: MiddlewareConsumer): void {
+    // eslint-disable-next-line prettier/prettier
     consumer
       .apply(RequestIdMiddleware)
       .forRoutes('*'); // Apply cho tất cả routes
