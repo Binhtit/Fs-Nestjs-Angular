@@ -1,0 +1,215 @@
+// ============================================================================
+// KHÁI NIỆM: Prisma Schema — "Blueprint" của Database
+//
+// TẠI SAO dùng Prisma thay vì TypeORM:
+// 1. Schema-first: Định nghĩa DB schema ở 1 file → generate code tự động
+// 2. Type-safe: Prisma Client generate TypeScript types 100% khớp DB
+// 3. Migration: prisma migrate dev tạo SQL migration tự động
+// 4. Preview data: prisma studio → GUI xem/edit data trực tiếp
+//
+// SO SÁNH PRISMA vs TYPEORM:
+// ┌──────────────────┬───────────────────┬────────────────────┐
+// │                  │ Prisma            │ TypeORM            │
+// ├──────────────────┼───────────────────┼────────────────────┤
+// │ Định nghĩa model │ schema.prisma     │ @Entity decorator  │
+// │ Query            │ prisma.user.find  │ repo.find()        │
+// │ Type-safety      │ 100% auto-gen     │ Cần khai báo thủ   │
+// │ Migration        │ prisma migrate    │ TypeORM migration  │
+// │ Raw SQL          │ prisma.$queryRaw  │ query()            │
+// └──────────────────┴───────────────────┴────────────────────┘
+//
+// LỖI PHỔ BIẾN:
+// - Quên chạy `npx prisma generate` sau khi sửa schema → code cũ
+// - Quên chạy `npx prisma migrate dev` → schema và DB lệch nhau
+// - Dùng @id mà quên autoincrement() → phải truyền ID thủ công
+// ============================================================================
+
+generator client {
+  provider   = "prisma-client-js"
+  // Prisma v7: Dùng adapter pattern (không cần Rust engine)
+  // → @prisma/adapter-better-sqlite3 kết nối SQLite
+}
+
+datasource db {
+  // SQLite cho development — có thể đổi sang PostgreSQL cho production
+  // Chỉ cần sửa provider = "postgresql" và DATABASE_URL trong .env
+  // LƯU Ý (Prisma v7): URL được cấu hình trong prisma.config.ts, không ở đây
+  provider = "sqlite"
+}
+
+// ============================================================================
+// USER — Người dùng hệ thống
+//
+// QUAN HỆ:
+// - 1 User → nhiều Post (tác giả)
+// - 1 User → nhiều Comment (người bình luận)
+//
+// ROLE: "ADMIN" | "AUTHOR" | "READER"
+// - ADMIN: Toàn quyền (CRUD tất cả)
+// - AUTHOR: Viết bài, bình luận, quản lý bài của mình
+// - READER: Chỉ đọc bài + bình luận
+// ============================================================================
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // Hashed bằng bcrypt (KHÔNG lưu plaintext)
+  name      String
+  role      String   @default("READER") // ADMIN | AUTHOR | READER
+
+  // Quan hệ: 1 User có nhiều Post và Comment
+  posts     Post[]
+  comments  Comment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users") // Tên bảng trong DB (snake_case convention)
+}
+
+// ============================================================================
+// POST — Bài viết
+//
+// SLUG: URL-friendly version of title
+//   Ví dụ: "Học NestJS cơ bản" → "hoc-nestjs-co-ban"
+//   TẠI SAO dùng slug: SEO tốt hơn, dễ đọc hơn so với /posts/123
+//
+// STATUS: "DRAFT" | "PUBLISHED" | "ARCHIVED"
+//   - DRAFT: Chỉ tác giả thấy
+//   - PUBLISHED: Công khai
+//   - ARCHIVED: Ẩn nhưng không xóa
+//
+// QUAN HỆ:
+// - 1 Post thuộc 1 User (tác giả) — bắt buộc
+// - 1 Post thuộc 1 Category — tùy chọn
+// - 1 Post có nhiều Tag (many-to-many qua bảng trung gian)
+// - 1 Post có nhiều Comment
+// ============================================================================
+model Post {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique // URL-friendly, unique
+  content     String   // Nội dung bài viết (markdown/html)
+  excerpt     String?  // Tóm tắt ngắn (optional)
+  thumbnail   String?  // URL ảnh đại diện (optional)
+  status      String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  viewCount   Int      @default(0) // Đếm lượt xem
+
+  // Quan hệ: Post thuộc về 1 User (tác giả)
+  author      User     @relation(fields: [authorId], references: [id])
+  authorId    Int
+
+  // Quan hệ: Post thuộc 1 Category (optional)
+  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  Int?
+
+  // Quan hệ many-to-many: Post ↔ Tag (qua bảng trung gian tự tạo)
+  tags        PostTag[]
+
+  // Quan hệ: 1 Post có nhiều Comment
+  comments    Comment[]
+
+  publishedAt DateTime? // Ngày đăng bài (null nếu chưa publish)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("posts")
+}
+
+// ============================================================================
+// CATEGORY — Danh mục bài viết
+//
+// Ví dụ: "Backend", "Frontend", "DevOps", "Database"
+// 1 Category có nhiều Post, nhưng 1 Post chỉ thuộc 1 Category
+// ============================================================================
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  description String? // Mô tả danh mục (optional)
+
+  // Quan hệ: 1 Category có nhiều Post
+  posts     Post[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("categories")
+}
+
+// ============================================================================
+// TAG — Nhãn/Tag cho bài viết
+//
+// Quan hệ MANY-TO-MANY với Post:
+// - 1 Post có thể gắn nhiều Tag: ["NestJS", "TypeScript", "Backend"]
+// - 1 Tag có thể thuộc nhiều Post
+//
+// CÁCH IMPLEMENT MANY-TO-MANY TRONG PRISMA:
+// - Explicit: Tạo bảng trung gian PostTag (khuyến nghị — dễ mở rộng)
+// - Implicit: Prisma tự tạo bảng _PostToTag (không kiểm soát được)
+// → Ở đây dùng EXPLICIT vì sau có thể thêm field (createdAt, order...)
+// ============================================================================
+model Tag {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  slug      String    @unique
+
+  // Quan hệ many-to-many qua bảng trung gian
+  posts     PostTag[]
+
+  createdAt DateTime  @default(now())
+
+  @@map("tags")
+}
+
+// ============================================================================
+// POST_TAG — Bảng trung gian cho quan hệ Many-to-Many (Post ↔ Tag)
+//
+// TẠI SAO dùng bảng trung gian EXPLICIT:
+// 1. Có thể thêm metadata (thứ tự, ngày gắn tag, ai gắn...)
+// 2. Query linh hoạt hơn
+// 3. Dễ debug hơn (nhìn thấy bảng trực tiếp)
+//
+// COMPOSITE KEY: @@id([postId, tagId])
+// → Đảm bảo 1 Post không gắn cùng 1 Tag hai lần
+// ============================================================================
+model PostTag {
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tagId     Int
+
+  assignedAt DateTime @default(now())
+
+  @@id([postId, tagId]) // Composite primary key
+  @@map("post_tags")
+}
+
+// ============================================================================
+// COMMENT — Bình luận trên bài viết
+//
+// NESTED RESOURCE pattern:
+// - URL: POST /api/v1/posts/:postId/comments
+// - Comment luôn thuộc về 1 Post (nested)
+// - Comment luôn có 1 Author (User đã đăng nhập)
+//
+// TẠI SAO comment luôn liên kết Post:
+// - Không có comment "trôi nổi" không thuộc bài nào
+// - Xóa Post → xóa tất cả Comment (onDelete: Cascade)
+// ============================================================================
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+
+  // Quan hệ: Comment thuộc 1 Post
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    Int
+
+  // Quan hệ: Comment thuộc 1 User (tác giả comment)
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}

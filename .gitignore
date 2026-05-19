@@ -6,3 +6,4 @@ yarn-error.log*
 .env
 nestjs-rxjs-learning/node_modules/
 **/dist
+.DS_Store
