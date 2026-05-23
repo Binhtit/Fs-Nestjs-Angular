@@ -60,8 +60,13 @@ model User {
   posts     Post[]
   comments  Comment[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // SOFT DELETE: Thay vì xóa vĩnh viễn, ghi lại thời điểm "xóa"
+  // null = chưa xóa | DateTime = đã xóa lúc đó
+  // Prisma middleware tự filter where: { deletedAt: null } cho mọi query
+  deletedAt DateTime?
 
   @@map("users") // Tên bảng trong DB (snake_case convention)
 }
@@ -111,6 +116,10 @@ model Post {
   publishedAt DateTime? // Ngày đăng bài (null nếu chưa publish)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  // SOFT DELETE: Tương tự User model
+  // Prisma middleware sẽ intercept delete → update deletedAt thay thế
+  deletedAt   DateTime?
 
   @@map("posts")
 }

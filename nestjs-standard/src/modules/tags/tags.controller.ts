@@ -20,8 +20,9 @@
  * - GET /tags/:slug → chi tiết tag + list posts của tag
  * - PATCH /tags/:id → đổi tên tag
  */
-import { Controller, Get, Post, Delete, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, ParseIntPipe, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { Public } from '../../common/decorators/public.decorator';
 import { RolesGuard, Roles } from '../../common/guards/roles.guard';
 import { TagsService } from './tags.service';
@@ -33,13 +34,22 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   /**
-   * GET /api/v1/tags — Danh sách tất cả tags
+   * GET /api/v1/tags — Danh sách tất cả tags (cached)
    *
    * @Public() → không cần JWT token
+   * @UseInterceptors(CacheInterceptor): Cache response 5 phút
+   * @CacheTTL(300000): 300,000ms = 5 phút
+   *
+   * Tags tương tự Categories: ít thay đổi, đọc nhiều
+   * → Cache-aside pattern: tự động cache read, manual invalidate khi write
+   * → TagsService sẽ gọi cacheManager.reset() sau create/delete
+   *
    * Response bao gồm _count.posts → số bài viết mỗi tag
    */
   @Public()
-  @ApiOperation({ summary: 'Danh sách tags (public)' })
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(300000)
+  @ApiOperation({ summary: 'Danh sách tags (public, cached 5 phút)' })
   @Get()
   findAll() {
     return this.tagsService.findAll();

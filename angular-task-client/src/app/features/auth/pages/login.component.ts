@@ -97,7 +97,7 @@ export class LoginComponent {
 
   form = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(4)]],
+    password: ['', [Validators.required, Validators.minLength(6)]], // Match backend: LoginDto @MinLength(6)
   });
 
   onSubmit(): void {

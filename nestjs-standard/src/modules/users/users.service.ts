@@ -25,9 +25,11 @@
  * - select: Chọn fields trả về (tránh trả password ra API!)
  */
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { UserEntity } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -52,21 +54,29 @@ export class UsersService {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          createdAt: true,
-          updatedAt: true,
-          // password: false ← KHÔNG trả password
-        },
+        /** SOFT DELETE: Chỉ lấy users chưa bị xóa (deletedAt: null) */
+        where: { deletedAt: null },
+        /**
+         * Không dùng select nữa — ClassSerializerInterceptor + @Exclude() trên UserEntity
+         * sẽ tự động loại bỏ password trước khi serialize ra response
+         *
+         * TRADE-OFF:
+         * - select: Không query password từ DB (tốt hơn về DB performance)
+         * - @Exclude(): Query có password nhưng không serialize ra (đơn giản hơn về code)
+         * → Dự án này ưu tiên code clean hơn, DB performance không phải bottleneck
+         */
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where: { deletedAt: null } }),
     ]);
 
     return {
-      data: users,
+      /**
+       * plainToInstance(UserEntity, users):
+       * - Prisma trả mảng plain objects → convert sang mảng UserEntity instances
+       * - ClassSerializerInterceptor sẽ apply @Exclude() → bỏ password
+       * - excludeExtraneousValues: true → chỉ giữ fields có @Expose()
+       */
+      data: plainToInstance(UserEntity, users, { excludeExtraneousValues: true }),
       pagination: {
         page,
         limit,
@@ -83,18 +93,11 @@ export class UsersService {
    * Nếu không tìm thấy → null → throw NotFoundException
    */
   async findOne(id: number) {
+    /** SOFT DELETE: Thêm deletedAt: null để không trả user đã bị xóa */
     const user = await this.prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: { posts: true, comments: true },
-        },
+      where: { id, deletedAt: null },
+      include: {
+        _count: { select: { posts: true, comments: true } },
       },
     });
 
@@ -102,7 +105,8 @@ export class UsersService {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    return user;
+    /** plainToInstance: convert để ClassSerializerInterceptor apply @Exclude() */
+    return plainToInstance(UserEntity, user, { excludeExtraneousValues: true });
   }
 
   /** Lấy user theo email (dùng nội bộ, ví dụ check trùng email) */
@@ -122,29 +126,48 @@ export class UsersService {
     /** Check user tồn tại trước khi update */
     await this.findOne(id);
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: dto,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
+
+    return plainToInstance(UserEntity, updated, { excludeExtraneousValues: true });
   }
 
   /**
-   * Xóa user (hard delete)
+   * Xóa user — SOFT DELETE (ghi deletedAt, không xóa thật)
    *
-   * LƯU Ý: Production nên dùng soft delete (set deletedAt)
-   * Ở đây dùng hard delete để demo Prisma delete()
+   * SOFT DELETE vs HARD DELETE:
+   * ┌─────────────────┬──────────────────────┬──────────────────────────┐
+   * │                 │ Hard Delete          │ Soft Delete              │
+   * ├─────────────────┼──────────────────────┼──────────────────────────┤
+   * │ Câu SQL         │ DELETE FROM users... │ UPDATE users SET         │
+   * │                 │                      │   deletedAt = now()...   │
+   * │ Có thể khôi phục│ Không                │ Có (set deletedAt = null)│
+   * │ Audit trail     │ Mất thông tin        │ Biết khi nào bị xóa      │
+   * │ DB storage      │ Nhỏ hơn              │ Lớn hơn (cần cleanup job)│
+   * │ Query phức tạp  │ Không                │ Phải luôn filter deletedAt│
+   * └─────────────────┴──────────────────────┴──────────────────────────┘
+   *
+   * Ở đây prisma.user.delete() sẽ bị Prisma middleware intercept
+   * → Tự động đổi thành update { deletedAt: new Date() }
+   * → Service/Controller không cần biết logic này
    */
   async remove(id: number) {
     await this.findOne(id);
-    await this.prisma.user.delete({ where: { id } });
-    return { message: `Đã xóa user ${id}` };
+    /**
+     * SOFT DELETE: Gọi update thay vì delete
+     *
+     * Prisma v7 đã bỏ $use() middleware → không thể intercept delete() tự động
+     * → Phải gọi update() trực tiếp với deletedAt = new Date()
+     *
+     * SQL tương đương: UPDATE users SET deletedAt = now() WHERE id = ?
+     * → Record vẫn còn trong DB, findMany với { deletedAt: null } sẽ không thấy
+     */
+    await this.prisma.user.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+    return { message: `Đã xóa user ${id} (soft delete)` };
   }
 }

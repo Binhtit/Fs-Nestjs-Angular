@@ -30,13 +30,19 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTagDto } from './dto/tag.dto';
 
 @Injectable()
 export class TagsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   /**
    * Tạo slug từ tên tag
@@ -58,12 +64,13 @@ export class TagsService {
   }
 
   /**
-   * Tạo tag mới
+   * Tạo tag mới + invalidate cache
    *
    * FLOW:
    * 1. Check tên tag đã tồn tại chưa → 409 Conflict
    * 2. Generate slug từ tên
    * 3. Insert vào DB
+   * 4. Xóa cache để request tiếp theo lấy list mới nhất
    *
    * findUnique({ where: { name } }):
    * - name là @unique field trong Prisma schema
@@ -77,9 +84,13 @@ export class TagsService {
       throw new ConflictException(`Tag "${dto.name}" đã tồn tại`);
     }
 
-    return this.prisma.tag.create({
+    const result = await this.prisma.tag.create({
       data: { name: dto.name, slug: this.generateSlug(dto.name) },
     });
+
+    await this.cacheManager.clear();
+
+    return result;
   }
 
   /**
@@ -98,16 +109,21 @@ export class TagsService {
   }
 
   /**
-   * Xóa tag
+   * Xóa tag + invalidate cache
    *
    * LƯU Ý: Prisma cascade sẽ tự xóa PostTag records liên quan
    * (tùy thuộc onDelete config trong schema.prisma)
+   *
+   * Sau khi xóa → danh sách tags thay đổi → reset cache
    */
   async remove(id: number) {
     const tag = await this.prisma.tag.findUnique({ where: { id } });
     if (!tag) throw new NotFoundException(`Tag ID ${id} không tồn tại`);
 
     await this.prisma.tag.delete({ where: { id } });
+
+    await this.cacheManager.clear();
+
     return { message: `Đã xóa tag "${tag.name}"` };
   }
 }

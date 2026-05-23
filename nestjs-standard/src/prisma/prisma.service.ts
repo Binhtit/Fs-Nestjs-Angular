@@ -13,6 +13,28 @@
  *   → Cần install @prisma/adapter-better-sqlite3 cho SQLite
  *   → Adapter là "cầu nối" giữa Prisma Client và database driver
  *
+ * SOFT DELETE — CÁCH TRIỂN KHAI TRONG PRISMA v7:
+ * - Prisma v5 có $use() middleware → intercept queries (auto soft delete)
+ * - Prisma v7 đã BỎ $use() → dùng $extends() (extensions) hoặc service-level
+ *
+ * DỰ ÁN NÀY: Service-level soft delete (explicit hơn, dễ hiểu hơn cho học):
+ * - remove() gọi update({ data: { deletedAt: new Date() } }) thay vì delete()
+ * - findMany/findUnique thêm where: { deletedAt: null } thủ công
+ *
+ * SO SÁNH 3 CÁCH SOFT DELETE TRONG PRISMA:
+ * ┌─────────────────────┬──────────────────────┬────────────────────────────┐
+ * │ Cách                │ Ưu điểm              │ Nhược điểm                 │
+ * ├─────────────────────┼──────────────────────┼────────────────────────────┤
+ * │ $use() middleware   │ Transparent, 1 chỗ   │ Deprecated v5, bỏ v7       │
+ * │ (đã bỏ)            │                      │                            │
+ * ├─────────────────────┼──────────────────────┼────────────────────────────┤
+ * │ $extends()          │ Supported v5+        │ Phức tạp hơn, type gymnastics│
+ * │ (recommended)       │ Type-safe            │                            │
+ * ├─────────────────────┼──────────────────────┼────────────────────────────┤
+ * │ Service-level       │ Đơn giản, rõ ràng    │ Phải nhớ filter ở mỗi query│
+ * │ (dùng ở đây)        │ Dễ hiểu, dễ debug    │ Có thể quên filter         │
+ * └─────────────────────┴──────────────────────┴────────────────────────────┘
+ *
  * CÁCH DÙNG:
  * - Inject PrismaService vào bất kỳ service nào cần query DB
  * - this.prisma.user.findMany() → lấy danh sách users
@@ -34,8 +56,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   /**
    * Constructor: Prisma v7 BẮT BUỘC truyền adapter
    *
-   * PrismaBetterSQLite3: Adapter cho SQLite (dùng better-sqlite3 driver)
+   * PrismaBetterSqlite3: Adapter cho SQLite (dùng better-sqlite3 driver)
    * - url: Đường dẫn file DB (tương đối từ thư mục project)
+   *        Format: 'file:./prisma/dev.db' (relative) hoặc 'file:/absolute/path/dev.db'
    * - Nếu đổi sang PostgreSQL: dùng @prisma/adapter-pg thay thế
    *
    * FLOW: PrismaClient → Adapter → Driver → Database

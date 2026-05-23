@@ -36,6 +36,7 @@ export interface UpdateTaskDto {
   title?: string;
   description?: string;
   status?: TaskStatus;
+  dueDate?: string | null; // Có thể set lại hoặc xóa ngày hạn (null = xóa)
 }
 
 /** Params cho query (filter, pagination) */

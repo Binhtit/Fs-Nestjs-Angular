@@ -19,8 +19,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import compression from 'compression';
 import helmet from 'helmet';
+import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -28,7 +30,11 @@ async function bootstrap() {
    * NestFactory.create(): Khởi tạo NestJS application
    * AppModule là ROOT MODULE — chứa tất cả imports
    */
-  const app = await NestFactory.create(AppModule);
+  /**
+   * NestExpressApplication: Typed version cho Express adapter
+   * Cần để dùng app.useStaticAssets() (serve static files)
+   */
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // ====================================================================
   // SECURITY: Helmet → thêm HTTP security headers
@@ -48,6 +54,15 @@ async function bootstrap() {
   // Production: đổi origin: '*' thành domain cụ thể
   // ====================================================================
   app.enableCors({ origin: '*' });
+
+  // ====================================================================
+  // STATIC FILES: Serve uploaded files qua HTTP
+  // Ví dụ: /uploads/1703123456789-abc.jpg → file trên disk
+  // useStaticAssets(path, options): Giống Express static middleware
+  // ====================================================================
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+  });
 
   // ====================================================================
   // API PREFIX: Tất cả routes có prefix /api/v1
@@ -121,4 +136,4 @@ async function bootstrap() {
   console.log(`📚 Swagger docs: http://localhost:${port}/api-docs`);
 }
 
-bootstrap();
+void bootstrap();

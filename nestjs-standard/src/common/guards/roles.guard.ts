@@ -39,6 +39,12 @@ import {
   SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { Request } from 'express';
+
+/** Shape của request.user được JwtStrategy gắn vào sau khi verify token */
+interface AuthenticatedRequest extends Request {
+  user?: { id: number; email: string; role: string };
+}
 
 /**
  * ROLES_KEY: Key cho metadata — dùng trong Guard để đọc
@@ -80,9 +86,9 @@ export class RolesGuard implements CanActivate {
     }
 
     /** Lấy user từ request (đã được JwtAuthGuard gắn) */
-    const { user } = context.switchToHttp().getRequest();
+    const { user } = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     /** Check user.role có nằm trong requiredRoles không */
-    return requiredRoles.includes(user?.role);
+    return requiredRoles.includes(user?.role ?? '');
   }
 }

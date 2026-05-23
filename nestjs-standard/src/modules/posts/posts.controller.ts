@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { TrimStringPipe } from '../../common/pipes/trim-string.pipe';
 import { PostsService } from './posts.service';
 import { CreatePostDto, UpdatePostDto, QueryPostDto } from './dto/post.dto';
 
@@ -44,10 +45,35 @@ export class PostsController {
   @ApiOperation({ summary: 'Tạo bài viết mới (cần đăng nhập)' })
   @Post()
   create(
-    @Body() dto: CreatePostDto,
+    /**
+     * TrimStringPipe: Bỏ khoảng trắng đầu/cuối trong title, content, excerpt
+     * → "  Hello World  " → "Hello World"
+     * → Áp dụng cho toàn bộ body object (đệ quy)
+     *
+     * Pipe được apply TRƯỚC khi DTO validation chạy
+     * → String đã được trim → @MaxLength tính đúng độ dài thực
+     */
+    @Body(TrimStringPipe) dto: CreatePostDto,
     @CurrentUser('id') userId: number,
   ) {
     return this.postsService.create(dto, userId);
+  }
+
+  /**
+   * PATCH /posts/:id/publish — Publish bài viết (dùng $transaction)
+   *
+   * Demo Prisma $transaction: atomic publish post
+   * Route /publish phải đặt TRƯỚC /:id để không bị hiểu là id='publish'
+   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Publish bài viết (dùng $transaction)' })
+  @Patch(':id/publish')
+  publish(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser('id') userId: number,
+    @CurrentUser('role') userRole: string,
+  ) {
+    return this.postsService.publishPost(id, userId, userRole);
   }
 
   /** Update post — chỉ owner/admin */

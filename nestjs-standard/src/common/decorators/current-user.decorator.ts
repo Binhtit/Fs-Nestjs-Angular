@@ -29,6 +29,12 @@
  * - Route có @Public() mà vẫn dùng @CurrentUser() → crash
  */
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { Request } from 'express';
+
+/** Shape của request.user được JwtStrategy gắn vào sau khi verify token */
+interface AuthenticatedRequest extends Request {
+  user?: Record<string, unknown>;
+}
 
 /**
  * createParamDecorator: Tạo decorator cho PARAMETER (không phải class/method)
@@ -40,7 +46,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export const CurrentUser = createParamDecorator(
   (data: string | undefined, ctx: ExecutionContext) => {
     /** switchToHttp() vì đang dùng HTTP (không phải WebSocket/gRPC) */
-    const request = ctx.switchToHttp().getRequest();
+    const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
     /** Nếu truyền field name → return field cụ thể, ngược lại return cả object */

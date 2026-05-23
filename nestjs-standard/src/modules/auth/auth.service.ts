@@ -32,6 +32,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { JwtPayload } from './strategies/jwt.strategy';
 
 @Injectable()
 export class AuthService {
@@ -144,8 +145,12 @@ export class AuthService {
    */
   async refreshTokens(refreshToken: string) {
     try {
-      /** Verify refresh token */
-      const payload = this.jwtService.verify(refreshToken, {
+      /**
+       * Verify refresh token — truyền JwtPayload làm type generic để có typing đầy đủ
+       * jwtService.verify<T>(): NestJS JWT hỗ trợ generic → không cần `as` cast
+       * → TypeScript biết payload có { sub, email, role } → không báo lỗi any
+       */
+      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET || 'blog-refresh-secret',
       });
 

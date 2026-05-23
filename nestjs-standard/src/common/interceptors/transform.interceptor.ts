@@ -31,6 +31,7 @@ import {
   ExecutionContext,
   CallHandler,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -52,8 +53,9 @@ export class TransformInterceptor<T>
     context: ExecutionContext,
     next: CallHandler<T>,
   ): Observable<StandardResponse<T>> {
-    const request = context.switchToHttp().getRequest();
-    const statusCode = context.switchToHttp().getResponse().statusCode;
+    const request = context.switchToHttp().getRequest<Request>();
+    const response = context.switchToHttp().getResponse<Response>();
+    const statusCode = response.statusCode;
 
     /**
      * map(): Transform controller response → StandardResponse

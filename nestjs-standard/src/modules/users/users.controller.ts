@@ -24,12 +24,12 @@ import {
   Param,
   Body,
   Query,
-  ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RolesGuard, Roles } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ParsePositiveIntPipe } from '../../common/pipes/parse-positive-int.pipe';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
@@ -70,15 +70,17 @@ export class UsersController {
   /**
    * GET /users/:id — Chi tiết user
    *
-   * ParseIntPipe: Convert string param → number
-   * URL params luôn là string: /users/1 → id = "1" (string)
-   * ParseIntPipe: "1" → 1 (number), "abc" → 400 Bad Request
+   * ParsePositiveIntPipe (thay cho ParseIntPipe):
+   * - ParseIntPipe: "1" → 1, "abc" → 400, nhưng "-1" → -1 (không hợp lý cho ID)
+   * - ParsePositiveIntPipe: "1" → 1, "abc" → 400, "-1" → 400, "0" → 400
+   * → Đảm bảo ID luôn là số nguyên dương hợp lệ
+   * → Demo Custom Pipe validation (phân biệt Pipe transform vs validate)
    */
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Chi tiết user (Admin only)' })
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParsePositiveIntPipe) id: number) {
     return this.usersService.findOne(id);
   }
 
@@ -87,7 +89,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Cập nhật user (Admin only)' })
   @Patch(':id')
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParsePositiveIntPipe) id: number,
     @Body() dto: UpdateUserDto,
   ) {
     return this.usersService.update(id, dto);
@@ -97,7 +99,7 @@ export class UsersController {
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Xóa user (Admin only)' })
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParsePositiveIntPipe) id: number) {
     return this.usersService.remove(id);
   }
 }
